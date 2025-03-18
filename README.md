@@ -12,7 +12,9 @@ Before running the app, ensure you have the following installed:
 
 ## Installation Instructions
 
-### 1. Install Poetry
+### 1. Install Poetry 
+
+poetry config virtualenvs.in-project true
 
 To install Poetry, run the following command:
 
