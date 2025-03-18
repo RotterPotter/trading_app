@@ -1,6 +1,6 @@
 from typing import List, Tuple, Optional, Dict
 from datetime import datetime
-from service import Service
+from src.service import Service
 from config import settings
 import json
 
