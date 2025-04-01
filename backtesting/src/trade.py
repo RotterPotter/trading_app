@@ -15,8 +15,8 @@ class Trade():
     ):
     Trade._id_counter += 1
     self.id = Trade._id_counter
-    self.opening_gmt_time = candle_data.GmtTime
-    self.closing_gmt_time = None
+    self.opening_time = candle_data.Time
+    self.closing_time = None
     self.trade_type = trade_type
     self.entering_price = candle_data.Close
     self.closing_price = None
@@ -25,7 +25,7 @@ class Trade():
     self.active_part = 100
     self.result = None
     self.pl = None
-    self.logs = pd.DataFrame([], columns=["GmtTime", "Log"])
+    self.logs = pd.DataFrame([], columns=["Time", "Log"])
     self.triggered_opening_checker = triggered_opening_checker
 
     # define stop loss and take profit
@@ -47,10 +47,10 @@ class Trade():
 
     
     # logging of the trade opening
-    self.log(self.opening_gmt_time, f"Trade {self.trade_type} was opened on the price {self.entering_price}.\nAction triggered by checker: {self.triggered_opening_checker}.\nStop loss:{self.stop_loss}\nTake profit:{self.take_profit}")
+    self.log(self.opening_time, f"Trade {self.trade_type} was opened on the price {self.entering_price}.\nAction triggered by checker: {self.triggered_opening_checker}.\nStop loss:{self.stop_loss}\nTake profit:{self.take_profit}")
 
-  def log(self, gmt_time:str, message:str):
-    new_data = pd.DataFrame([[gmt_time, message]], columns=["GmtTime", "Log"])
+  def log(self, time:str, message:str):
+    new_data = pd.DataFrame([[time, message]], columns=["Time", "Log"])
     self.logs = pd.concat([self.logs, new_data], ignore_index=True)
   
   def close(self, candle_data, triggered_checker):
@@ -77,35 +77,35 @@ class Trade():
       self.pl = ((self.closing_price - self.entering_price) / self.entering_price) * self.position_in_percantage * 100
 
 
-    self.closing_gmt_time = candle_data.GmtTime
+    self.closing_time = candle_data.Time
     self.active_part = 0
-    self.log(candle_data.GmtTime, f"Trade {self.trade_type} was closed on the price {candle_data.Close}.\nAction triggered by checker: {triggered_checker}.\nResult: {self.result}\nP/L: {self.pl}%.")
+    self.log(candle_data.Time, f"Trade {self.trade_type} was closed on the price {candle_data.Close}.\nAction triggered by checker: {triggered_checker}.\nResult: {self.result}\nP/L: {self.pl}%.")
     if triggered_checker:
       self.triggered_checkers.append(triggered_checker)
 
   def update_stop_loss(self, candle_data, new_stop_loss:float, triggered_checker):
     self.stop_loss = new_stop_loss
-    self.log(candle_data.GmtTime, f"Stop loss was updated by {triggered_checker}.\nNew stop loss:{new_stop_loss}")
+    self.log(candle_data.Time, f"Stop loss was updated by {triggered_checker}.\nNew stop loss:{new_stop_loss}")
     if triggered_checker:
       self.triggered_checkers.append(triggered_checker)
 
   def close_part(self, candle_data, part_amount_perctage:float, triggered_checker: Optional[str] = None) -> bool:
     if (self.active_part - part_amount_perctage) < 0:
       self.active_part = 0
-      self.log(candle_data.GmtTime, f"Trade was partially closed on the price{candle_data.Close}.\nAction triggered by checker: {triggered_checker}.\nClosed by: {part_amount_perctage}%.\nRemaining position part: {self.active_part}%.\nInitializing closing trade process...")
+      self.log(candle_data.Time, f"Trade was partially closed on the price{candle_data.Close}.\nAction triggered by checker: {triggered_checker}.\nClosed by: {part_amount_perctage}%.\nRemaining position part: {self.active_part}%.\nInitializing closing trade process...")
       if triggered_checker:
         self.triggered_checkers.append(triggered_checker)
       self.close(candle_data=candle_data)
       return True
     else:
       self.active_part -= part_amount_perctage
-      self.log(candle_data.GmtTime, f"Trade was partially closed on the price{candle_data.Close}.\nAction triggered by checker: {triggered_checker}.\nClosed by: {part_amount_perctage}%.\nRemaining position part: {self.active_part}%.")
+      self.log(candle_data.Time, f"Trade was partially closed on the price{candle_data.Close}.\nAction triggered by checker: {triggered_checker}.\nClosed by: {part_amount_perctage}%.\nRemaining position part: {self.active_part}%.")
       if triggered_checker:
         self.triggered_checkers.append(triggered_checker)
       return False
   
   def __str__(self):
-    return f'{self.trade_type} trade ({self.opening_gmt_time}) - ({self.closing_gmt_time})'
+    return f'{self.trade_type} trade ({self.opening_time}) - ({self.closing_time})'
   
   def to_dict(self):
     return {

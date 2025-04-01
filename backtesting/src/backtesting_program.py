@@ -30,7 +30,7 @@ class BacktestingPorgram:
       action, triggered_checker_name = self.checker.check(candle_data, trade_is_opened=trade_is_opened, opened_trade_type=opened_trade_type)  # uses all active checkers to check candle data
       
       # loggs an action and triggered_checker_name, candle gmt
-      self.checker_log(candle_data.GmtTime, action, triggered_checker_name)
+      self.checker_log(candle_data.Time, action, triggered_checker_name)
 
       if action in ["SKIP", None]:
         continue

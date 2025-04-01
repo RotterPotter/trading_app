@@ -116,7 +116,7 @@ class Checker:
         None tells to the program to execute the next available checker.
     """
     start_time = datetime.strptime(self.params["start_time"], "%H:%M").time()
-    candle_time = datetime.strptime(str(candle_data.GmtTime).split(" ")[1][:5], "%H:%M").time()
+    candle_time = datetime.strptime(str(candle_data.Time).split(" ")[1][:5], "%H:%M").time()
     if candle_time < start_time:
       return "SKIP"
     return None
@@ -131,7 +131,7 @@ class Checker:
         "CLOSE" action means that program should close the trade.
     """
     end_time = datetime.strptime(self.params["end_time"], "%H:%M").time()
-    candle_time = datetime.strptime(str(candle_data.GmtTime).split(" ")[1][:5], "%H:%M").time()
+    candle_time = datetime.strptime(str(candle_data.Time).split(" ")[1][:5], "%H:%M").time()
     if candle_time >= end_time:
       return "CLOSE 100%"
     return None
@@ -147,7 +147,7 @@ class Checker:
         None tells to the program to go through the next available checker.
 
     """
-    candle_time = datetime.strptime(str(candle_data.GmtTime).split(" ")[1][:5], "%H:%M").time()
+    candle_time = datetime.strptime(str(candle_data.Time).split(" ")[1][:5], "%H:%M").time()
     no_more_trades_time = datetime.strptime(self.params["no_more_trades_time"], "%H:%M").time()
     if candle_time >= no_more_trades_time:
       return "SKIP"
@@ -212,10 +212,10 @@ class Checker:
       executed_trades = json.load(fp)
 
     service = Service()
-    candle_data_date = service.get_datetime_from_iso_string(str(candle_data.GmtTime)).date()
+    candle_data_date = service.get_datetime_from_iso_string(str(candle_data.Time)).date()
     for trade in executed_trades:
       if trade["trade_type"].startswith("SELL"):
-        executed_trade_date = service.get_datetime_from_iso_string(trade["opening_gmt_time"]).date()
+        executed_trade_date = service.get_datetime_from_iso_string(trade["opening_time"]).date()
         if candle_data_date == executed_trade_date:
           return "SKIP"
       
@@ -226,10 +226,10 @@ class Checker:
       executed_trades = json.load(fp)
     
     service = Service()
-    candle_data_date = service.get_datetime_from_iso_string(str(candle_data.GmtTime)).date()
+    candle_data_date = service.get_datetime_from_iso_string(str(candle_data.Time)).date()
     for trade in executed_trades:
       if trade["trade_type"].startswith("BUY"):
-        executed_trade_date = service.get_datetime_from_iso_string(trade["opening_gmt_time"]).date()
+        executed_trade_date = service.get_datetime_from_iso_string(trade["opening_time"]).date()
         if candle_data_date == executed_trade_date:
           return "SKIP"
         
@@ -239,10 +239,13 @@ class Checker:
     service = Service()
     pdLSH = service.find_pdLSH(candle_data, self.data)
     adL = service.find_adL(candle_data, self.data)
+    if pdLSH is None or adL is None:
+      return None
+    
     stop_loss_is_sell_price = True if "updating_sell_stop_loss_checker" in self.opened_trade.triggered_checkers else False
     
     if not stop_loss_is_sell_price and candle_data.Low <= service.calculate_half_fib_sell(pdLSH, adL):
-      trade_opening_candle_data = service.take_candle_data_by_iso(self.opened_trade.opening_gmt_time, self.data)
+      trade_opening_candle_data = service.take_candle_data_by_iso(self.opened_trade.opening_time, self.data)
       op_pdLSH = service.find_pdLSH(trade_opening_candle_data, self.data)
       op_adL = service.find_adL(trade_opening_candle_data, self.data)
       trade_sell_price_on_opening = service.calculate_sell_price(op_pdLSH, op_adL)
@@ -253,9 +256,12 @@ class Checker:
     service = Service()
     pdLSL = service.find_pdLSL(candle_data, self.data)
     adH = service.find_adH(candle_data, self.data)
+    if pdLSL is None or adH is None:
+      return None
+    
     stop_loss_is_buy_price = True if "updating_buy_stop_loss_checker" in self.opened_trade.triggered_checkers else False
     if not stop_loss_is_buy_price and candle_data.High >= service.calculate_half_fib_buy(pdLSL, adH):
-      trade_opening_candle_data = service.take_candle_data_by_iso(self.opened_trade.opening_gmt_time, self.data)
+      trade_opening_candle_data = service.take_candle_data_by_iso(self.opened_trade.opening_time, self.data)
       op_pdLSL = service.find_pdLSL(trade_opening_candle_data, self.data)
       op_adH = service.find_adH(trade_opening_candle_data, self.data)
       trade_buy_price_on_opening = service.calculate_buy_price(op_pdLSL, op_adH)
@@ -279,6 +285,8 @@ class Checker:
     adL = service.find_adL(candle_data, self.data)
     pdLSH = service.find_pdLSH(candle_data, self.data)
     sell_price = service.calculate_sell_price(pdLSH, adL)
+    if pdLSH is None or adL is None:
+      return None
 
     if candle_data.High >= stop_loss and stop_loss_is_sell_price == False and stop_loss > sell_price:
       return "CLOSE 100%"
@@ -290,6 +298,8 @@ class Checker:
     stop_loss_is_buy_price = True if "updating_buy_stop_loss_checker" in self.opened_trade.triggered_checkers else False
     adH = service.find_adH(candle_data, self.data)
     pdLSL = service.find_pdLSL(candle_data, self.data)
+    if pdLSL is None or adH is None:
+      return None
     buy_price = service.calculate_buy_price(pdLSL, adH)
 
     if candle_data.Low <= stop_loss and stop_loss_is_buy_price == False and stop_loss < buy_price:

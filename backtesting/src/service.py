@@ -13,13 +13,14 @@ class Service:
             from_: Union[str, int, datetime, date],
             to: Union[str, int, datetime, date],
             candle_size: int,
-            limit: Optional[int] = None
-) -> pd.DataFrame:
+            limit: Optional[int] = None,
+            tz_convert: Optional[str] = None
+    ) -> pd.DataFrame:
         client = RESTClient(api_key=settings.POLYGON_API_KEY)
         aggs = []
         for a in client.list_aggs(ticker="C:XAUUSD", multiplier=candle_size, timespan="minute", from_=from_, to=to, limit=limit):
             data = {
-                "GmtTime": pd.to_datetime(a.timestamp, unit='ms', utc=True),
+                "Time": pd.to_datetime(a.ti3mestamp, unit='ms', utc=True) if tz_convert is None else pd.to_datetime(a.timestamp, unit='ms', utc=True).tz_convert(tz_convert),
                 "Open": a.open,
                 "High": a.high,
                 "Low": a.low,
@@ -27,7 +28,12 @@ class Service:
                 "Volume": a.volume
             }
             aggs.append(data)
+        
         df = pd.DataFrame(aggs)
+        
+        # Convert 'Time' column to string with timezone using apply
+        df['Time'] = df['Time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S%z'))
+        
         return df
     
     def calculate_sell_price(self, pdLSH: float, adL: float) -> float:
@@ -61,10 +67,10 @@ class Service:
             3. Returns None if previous date dataframe is empty.
             4. Returns Max value in "High" column of the previous date dataframe.
         """
-        candle_date_datetime = self.get_datetime_from_iso_string(candle_data.GmtTime)
+        candle_date_datetime = self.get_datetime_from_iso_string(candle_data.Time)
         previous_day_date_datetime = candle_date_datetime - timedelta(days=1)
         previous_day_date_string = str(previous_day_date_datetime.date())
-        filtered_df = data[data['GmtTime'].str.startswith(previous_day_date_string)]
+        filtered_df = data[data['Time'].str.startswith(previous_day_date_string)]
 
         if filtered_df.empty:
             return None
@@ -78,10 +84,10 @@ class Service:
             3. Returns None if previous date dataframe is empty.
             4. Returns Min value in "Low" column of the previous date dataframe.
         """
-        candle_date_datetime = self.get_datetime_from_iso_string(candle_data.GmtTime)
+        candle_date_datetime = self.get_datetime_from_iso_string(candle_data.Time)
         previous_day_date_datetime = candle_date_datetime - timedelta(days=1)
         previous_day_date_string = str(previous_day_date_datetime.date())
-        filtered_df = data[data['GmtTime'].str.startswith(previous_day_date_string)]
+        filtered_df = data[data['Time'].str.startswith(previous_day_date_string)]
 
         if filtered_df.empty:
             return None
@@ -95,9 +101,9 @@ class Service:
             3. Returns None if actual date dataframe is empty.
             4. Returns Max value in "High" column of the actual date dataframe.
         """
-        candle_date_datetime = self.get_datetime_from_iso_string(candle_data.GmtTime)
+        candle_date_datetime = self.get_datetime_from_iso_string(candle_data.Time)
         candle_date_string = str(candle_date_datetime.date())
-        filtered_df = data[data['GmtTime'].str.startswith(candle_date_string)]
+        filtered_df = data[data['Time'].str.startswith(candle_date_string)]
 
         if filtered_df.empty:
             return None
@@ -111,9 +117,9 @@ class Service:
             3. Returns None if actual date dataframe is empty.
             4. Returns Min value in "Low" column of the actual date dataframe.
         """
-        candle_date_datetime = self.get_datetime_from_iso_string(candle_data.GmtTime)
+        candle_date_datetime = self.get_datetime_from_iso_string(candle_data.Time)
         candle_date_string = str(candle_date_datetime.date())
-        filtered_df = data[data['GmtTime'].str.startswith(candle_date_string)]
+        filtered_df = data[data['Time'].str.startswith(candle_date_string)]
 
         if filtered_df.empty:
             return None
@@ -136,7 +142,7 @@ class Service:
             return self.find_adH(candle_data, data)
 
     def take_candle_data_by_iso(self, iso_string:str, data):
-        filtered_df = data[data['GmtTime'].str.startswith(iso_string)]
+        filtered_df = data[data['Time'].str.startswith(iso_string)]
         for el in filtered_df.itertuples():
             return el
 
