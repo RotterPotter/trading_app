@@ -1,5 +1,5 @@
 from typing import List, Tuple, Optional, Dict
-from datetime import datetime
+from datetime import datetime, timezone, timedelta, time
 from src.service import Service
 from config import settings
 import json
@@ -9,7 +9,7 @@ class VariableRequired(Exception):
     super().__init__(message)
 
 class Checker:
-  def __init__(self, active_checkers:Dict[str, List[str]], data, params: dict):
+  def __init__(self, active_checkers:Dict[str, List[str]], data, params: dict, tz_offset:int):
     self.CHECKERS = {
       "start_time_checker": self.start_time_checker,
       "end_time_checker": self.end_time_checker,
@@ -25,17 +25,21 @@ class Checker:
       "to_close_sell_trade_2_checker": self.to_close_sell_trade_2_checker,
       "to_close_buy_trade_2_checker": self.to_close_buy_trade_2_checker,
       "to_close_sell_trade_3_checker": self.to_close_sell_trade_3_checker,
-      "to_close_buy_trade_3_checker": self.to_close_buy_trade_3_checker
+      "to_close_buy_trade_3_checker": self.to_close_buy_trade_3_checker,
+      # sniping checkers
+      "is_new_york_session_checker": self.is_new_york_session_checker,
     }
     self.REQUIRED_PARAMS = {
       "start_time_checker": ["start_time",],
       "end_time_checker": ["end_time", ],
       "no_more_trades_time_checker" : ["no_more_trades_time",],
+      "is_new_york_session_checker": ["new_york_session_start_time", "new_york_session_end_time"] # format: "HH:MM"
     }
     self.data = data
     self.params = params
     self.active_checkers = active_checkers
     self.opened_trade = None
+    self.timezone = timezone(timedelta(hours=tz_offset)) 
 
     # check if required params for checkers are passed. if not, raise ParamsRequired custom error
     try:
@@ -313,6 +317,53 @@ class Checker:
   def to_close_buy_trade_3_checker(self, candle_data):
     if candle_data.High >= self.opened_trade.take_profit:
       return "CLOSE 100%"
+
+
+  """
+  -------------------------------------------------------------------------------------------------------------------------------------------------------------
+    Sniping strategy checkers
+  """
+ 
+  def is_new_york_session_checker(self, candle_data):
+    """
+      -surname:
+        "sniping_checker_0"
+      -purpose:
+        Check if observed candle is in new york session
+      -how works:
+        1. Takes new york session timing ( for time zone that we use in our program )
+        2. Checks if: nys_start < candle time < nys_end
+    """
+    new_york_session_start_str = self.params["new_york_session_start_time"]
+    new_york_session_end_str = self.params["new_york_session_end_time"]
+
+    new_york_session_start_time = time(hour=int(new_york_session_start_str.split(":")[0]), minute=int(new_york_session_start_str.split(":")[1]))
+    new_york_session_end_time = time(hour=int(new_york_session_end_str.split(":")[0]), minute=int(new_york_session_end_str.split(":")[1]))
+
+    candle_time = time(hour=int(candle_data.Time.split(" ")[1].split(":")[0]), minute=int(candle_data.Time.split(" ")[1].split(":")[1]))
+
+    if new_york_session_start_time < candle_time < new_york_session_end_time:
+      return None
+    else:
+      return "SKIP"
+  
+  def search_imbalance_checker(self, canlde_data):
+    """
+      -surname:
+        "sniping_checker_1"
+      -purpose:
+        Search candle that created imbalance on a 4hour time frame.
+        Search candle that fullfiled imbalance on a 4hour time frame.
+      -how works:
+        1. Slices historical data to include
+    """
+    pass
+
+
+
+  """
+  -------------------------------------------------------------------------------------------------------------------------------------------------------------
+  """
 
 
   
