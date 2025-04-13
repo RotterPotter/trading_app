@@ -4,23 +4,32 @@ import pandas as pd
 import datetime
 from config import settings
 from typing import Union, Optional
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+from typing import List
 
 
 class Service:
+    def __init__(self):
+        self.sessions_schedule_utc0 = {
+            "Sydney": [-2, 7], # "-" means previous day
+            "Tokyo": [0, 9],
+            "London": [8, 17],
+            "New York": [13, 22]
+        }
+
     def take_polygon_gold_historical_data(
             self, 
             from_: Union[str, int, datetime, date],
             to: Union[str, int, datetime, date],
             candle_size: int,
             limit: Optional[int] = None,
-            tz_convert: Optional[str] = None
+            tz: timezone = timezone.utc
     ) -> pd.DataFrame:
         client = RESTClient(api_key=settings.POLYGON_API_KEY)
         aggs = []
         for a in client.list_aggs(ticker="C:XAUUSD", multiplier=candle_size, timespan="minute", from_=from_, to=to, limit=limit):
             data = {
-                "Time": pd.to_datetime(a.ti3mestamp, unit='ms', utc=True) if tz_convert is None else pd.to_datetime(a.timestamp, unit='ms', utc=True).tz_convert(tz_convert),
+                "Time": datetime.fromtimestamp(a.timestamp / 1000, tz=tz),
                 "Open": a.open,
                 "High": a.high,
                 "Low": a.low,
@@ -32,7 +41,7 @@ class Service:
         df = pd.DataFrame(aggs)
         
         # Convert 'Time' column to string with timezone using apply
-        df['Time'] = df['Time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S%z'))
+        # df['Time'] = df['Time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S%z'))
         
         return df
     
@@ -145,4 +154,62 @@ class Service:
         filtered_df = data[data['Time'].str.startswith(iso_string)]
         for el in filtered_df.itertuples():
             return el
+        
+    def take_candle_sessions(self, candle_datetime:datetime) -> List[str]:
+        candle_datetime_utc = candle_datetime.astimezone(timezone.utc)
+        
+        candle_sessions = []
+        candle_hour = candle_datetime_utc.hour
 
+        if candle_hour >= 22:
+            candle_hour -= 24
+
+        for session_name, session_schedule in self.sessions_schedule_utc0.items():
+            session_start_hour = session_schedule[0]
+            session_end_hour = session_schedule[1]
+            if session_start_hour <= candle_hour < session_end_hour:
+                candle_sessions.append(session_name)
+
+        return candle_sessions
+    
+    def slice_data_from_session_start_to_candle(self, session_name: str, candle_datetime:datetime, data: pd.DataFrame, tz: timezone) -> pd.DataFrame:
+        """
+            1. Takes session start hour  in utc0.
+            2. Converts session start in timezone of the program.
+            3. Creates a datetime object with candle date and start session hour
+            4. If this datetime object > then candle date object, dicrease it by 1 day
+            5. Filters dataframe
+        """
+        session_start_hour_utc = self.sessions_schedule_utc0[session_name][0]
+        if session_start_hour_utc < 0:
+            session_start_hour_utc += 24
+
+        tz_utc_offset = int(self.utc_offset_in_hours(tz))
+
+        session_start_hour_converted = session_start_hour_utc + tz_utc_offset
+        session_start_datetime = datetime(
+            year=candle_datetime.year,
+            month=candle_datetime.month,
+            day=candle_datetime.day,
+            hour=session_start_hour_converted,
+            tzinfo=tz
+        )
+
+        if session_start_datetime > candle_datetime:
+            session_start_datetime -= timedelta(days=1)
+        
+        return data[(data['Time'] >= session_start_datetime) & (data['Time'] <= candle_datetime)]
+
+    def utc_offset_in_hours(self, tz):
+        """
+        Returns the difference in hours between UTC and the given timezone.
+        
+        Parameters:
+            tz (timezone): A timezone object (from zoneinfo, pytz, etc.)
+        
+        Returns:
+            float: UTC offset in hours
+        """
+        now_utc = datetime.now(timezone.utc)
+        offset = tz.utcoffset(now_utc)
+        return offset.total_seconds() / 3600

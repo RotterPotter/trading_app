@@ -1,14 +1,14 @@
 import unittest
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '')))
 from src.checker import Checker
 import pandas as pd
 
 class TestIsNewYorkSessionChecker(unittest.TestCase):
   def setUp(self):
     with open("backtesting/tests/testing_data.csv", "r") as fp:
-      data = pd.read_csv(fp)
+      data = pd.read_csv(fp, parse_dates=['Time'])
     self.data = data  
     self.checker = Checker(
       active_checkers={

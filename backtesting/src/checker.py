@@ -40,6 +40,7 @@ class Checker:
     self.active_checkers = active_checkers
     self.opened_trade = None
     self.timezone = timezone(timedelta(hours=tz_offset)) 
+    self.service = Service()
 
     # check if required params for checkers are passed. if not, raise ParamsRequired custom error
     try:
@@ -330,22 +331,14 @@ class Checker:
         "sniping_checker_0"
       -purpose:
         Check if observed candle is in new york session
-      -how works:
-        1. Takes new york session timing ( for time zone that we use in our program )
-        2. Checks if: nys_start < candle time < nys_end
     """
-    new_york_session_start_str = self.params["new_york_session_start_time"]
-    new_york_session_end_str = self.params["new_york_session_end_time"]
+    candle_sessions_list = self.service.take_candle_sessions(candle_data.Time)
 
-    new_york_session_start_time = time(hour=int(new_york_session_start_str.split(":")[0]), minute=int(new_york_session_start_str.split(":")[1]))
-    new_york_session_end_time = time(hour=int(new_york_session_end_str.split(":")[0]), minute=int(new_york_session_end_str.split(":")[1]))
-
-    candle_time = time(hour=int(candle_data.Time.split(" ")[1].split(":")[0]), minute=int(candle_data.Time.split(" ")[1].split(":")[1]))
-
-    if new_york_session_start_time < candle_time < new_york_session_end_time:
+    if "New York" in candle_sessions_list:
       return None
     else:
       return "SKIP"
+    
   
   def search_imbalance_checker(self, canlde_data):
     """
