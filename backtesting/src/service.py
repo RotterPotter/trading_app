@@ -155,6 +155,20 @@ class Service:
         for el in filtered_df.itertuples():
             return el
         
+    def utc_offset_in_hours(self, tz):
+        """
+        Returns the difference in hours between UTC and the given timezone.
+        
+        Parameters:
+            tz (timezone): A timezone object (from zoneinfo, pytz, etc.)
+        
+        Returns:
+            float: UTC offset in hours
+        """
+        now_utc = datetime.now(timezone.utc)
+        offset = tz.utcoffset(now_utc)
+        return offset.total_seconds() / 3600
+        
     def take_candle_sessions(self, candle_datetime:datetime) -> List[str]:
         candle_datetime_utc = candle_datetime.astimezone(timezone.utc)
         
@@ -199,17 +213,19 @@ class Service:
             session_start_datetime -= timedelta(days=1)
         
         return data[(data['Time'] >= session_start_datetime) & (data['Time'] <= candle_datetime)]
-
-    def utc_offset_in_hours(self, tz):
-        """
-        Returns the difference in hours between UTC and the given timezone.
+    
+    def find_imbalance_zone(self, candle_1_data, candle_2_data, candle_3_data):
+        # 1. Check if three candles market structure is bullish or bearish
+        if candle_1_data.Close < candle_2_data.Close < candle_3_data.Close:
+            # bullish
+            # Check if 1st candle high is lower than 3rd candle low
+            if candle_1_data.High <= candle_3_data.Low:
+                # return gap between them (imbalance zone)
+                return (candle_1_data.High, candle_3_data.Low) # (small, big)
+        elif candle_1_data.Close > candle_2_data.Close > candle_3_data.Close:
+            # bearish
+            # Check if 1st candle low >= 3rd canlde high
+            if candle_1_data.Low >= candle_3_data.High:
+                return (candle_3_data.High, candle_1_data.Low) # (small, big)
         
-        Parameters:
-            tz (timezone): A timezone object (from zoneinfo, pytz, etc.)
         
-        Returns:
-            float: UTC offset in hours
-        """
-        now_utc = datetime.now(timezone.utc)
-        offset = tz.utcoffset(now_utc)
-        return offset.total_seconds() / 3600
