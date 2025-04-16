@@ -340,20 +340,100 @@ class Checker:
       return "SKIP"
     
   
-  def search_imbalance_checker(self, canlde_data):
-    """
-      -surname:
-        "sniping_checker_1"
-      -purpose:
-        Search candle that created imbalance on a 4hour time frame.
-        Search candle that fullfiled imbalance on a 4hour time frame.
-      -how works:
-        1. Slices historical data to include
-    """
-    pass
-  
+  def sniping_strategy_entry_checker(self, candle_data):
+    # Check previous 3 days data availability
+    dt_end = candle_data.Time
+    dt_start = dt_end - timedelta(days=3)
+    last_3_days_df = self.service.filter_df_by_datetime(self.data, dt_start, dt_end)
+    if not last_3_days_df:
+      return None
+    
+    # Take last 1 day df
+    dt_end = candle_data.Time
+    dt_start = dt_end - timedelta(days=1)
+    last_1_day_df = self.service.filter_df_by_datetime(self.data, dt_start, dt_end)
+    
+    # Check if price in some entry model
+    entry_model_tuple = self.service.detect_price_entry_model(last_1_day_df)
+    if not entry_model_tuple:
+      return None
+    entry_model_name, entry_model_df = entry_model_tuple
+    
+    # Check if price in a good entering position of an entry model
+    if not self.service.price_in_good_entry_position_of_the_model(candle_data, entry_model_name, entry_model_df):
+      return None
+    
+    # Take consolidation within entry model df
+    consolidation_df = self.service.find_consolidation(entry_model_df)
+    if not consolidation_df:
+      return None
+    
+    # Take entry model's swing cndl ( to trace fib)
+    swing_cndl = self.service.find_entry_model_swing_candle(entry_model_df)
+    if not swing_cndl:
+      return None
+    
+    # Identify last 3 days market structure
+    last_3days_market_structure:str = self.service.identify_market_structure(last_3_days_df)
 
+    # Identify entry model structure
+    consolidation_low, consolidation_high = consolidation_df.min(consolidation_df["Low"]), consolidation_df.max(consolidation_df["High"])
+    model_structure = "bullish" if consolidation_high < swing_cndl.High else "bearish"
 
+    # Check if entry model market structure alligns with last 3 days market structure
+    if not last_3days_market_structure != model_structure:
+      return None
+    
+    # Calculate 0.764fib level price
+    if model_structure == "bullish":
+      fib_level_price = self.service.calculate_fibonacci_level(fib=0.764, from_=consolidation_low, to=swing_cndl.High)
+    elif model_structure == "bearish":
+      fib_level_price = self.service.calculate_fibonacci_level(fib=0.764, from_=consolidation_high, to=swing_cndl.Low)
+    
+    # Check if fib level is in a consolidation zone
+    if not consolidation_low <= fib_level_price <= consolidation_high:
+      return None
+    
+    # Identify premium area dataframe
+    premium_area_df = self.service.find_premium_area_df(consolidation_df, fib_level_price, model_structure)
+
+    # Find supply & demand in a premium area
+    supply_demand_df = self.service.find_supply_demand(premium_area_df)
+    if not supply_demand_df:
+      return None
+    
+    # Find internal & external liquidities
+    internal_liquidity = self.service.find_liquidity(consolidation_df)
+    external_liquidity = self.service.find_liquidity(entry_model_df)
+    if not internal_liquidity or not external_liquidity:
+      return None
+    
+    # Check if last day p.o.c in a consolidation zone
+    poc_level = self.service.calculate_poc_level(last_1_day_df)
+    if not consolidation_low <= poc_level <= consolidation_high:
+      return None
+    
+    # Find imbalance in a consolidation zone
+    imbalance = self.service.find_imbalance(consolidation_df)
+    if not imbalance:
+      return None
+    
+    # TODO checked something with session liquidity 
+
+    # Set entry price
+    entry_price = fib_level_price
+
+    # Set stop loss
+    stop_loss = consolidation_low if model_structure == "bullish" else consolidation_high
+
+    # Set target 
+    target = swing_cndl.High if model_structure == "bullish" else swing_cndl.Low
+
+    # Set order type
+    order_type = "BUY" if model_structure == "bullish" else "SELL"
+
+    # Execute an order
+    return f"{order_type} 1%; ENTER_ON {entry_price}; STOP_LOSS {stop_loss}; TARGET {target}"
 
   """
   -------------------------------------------------------------------------------------------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-const chart = LightweightCharts.createChart(document.body, { width: 1400, height: 800, timeScale: {timeVisible:true, secondsVisible: true}});
+const chart = LightweightCharts.createChart(document.body, { width: 1600, height: 800, timeScale: {timeVisible:true, secondsVisible: true}});
 const candlestickSeries = chart.addSeries(LightweightCharts.CandlestickSeries, { upColor: '#26a69a', downColor: '#ef5350', borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350' });
 
 const loadData = async () => {
