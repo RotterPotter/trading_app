@@ -6,6 +6,7 @@ from config import settings
 from typing import Union, Optional, Dict
 from datetime import date, datetime, timedelta, timezone
 from typing import List
+import decimal
 
 
 class Service:
@@ -349,8 +350,49 @@ class Service:
                 # take difference for bearish ( from cndl1.High to cndl2.Low)
             
 
+    def relatively_describe_candle(self, cndl_data) -> List[float]:
+        decimal.getcontext().prec = 100
 
+        cndl_close = decimal.Decimal(cndl_data.Close)
+        cndl_open = decimal.Decimal(cndl_data.Open)
+        cndl_high = decimal.Decimal(cndl_data.High)
+        cndl_low = decimal.Decimal(cndl_data.Low)
+        cl_op_rel_mov = (cndl_close / cndl_open) - 1
+        low_op_rel_mov = (cndl_low / cndl_open) - 1
+        h_op_rel_mov = (cndl_high / cndl_open) - 1 
 
+        return [round(cl_op_rel_mov * 100000, 2), round(low_op_rel_mov * 100000, 2), round(h_op_rel_mov * 100000, 2)]
+
+    def build_relative_candles_combo(self, candles_datas_list: list) -> List[List[float]]:
+        return [self.relatively_describe_candle(candle_data) for candle_data in candles_datas_list]
+    
+
+    def compare_relative_candles_combos(self, combo1: List[List[float]], combo2: List[List[float]], threshold: float):
+        if not len(combo1) == len(combo2):
+            return False
+        
+        for i, described_candle in enumerate(combo1):
+            for j, relative_change in enumerate(described_candle):
+                if not (relative_change - threshold) <= combo2[i][j] <= (relative_change + threshold):
+                    return False
+        return True
+    
+    def find_combos_in_candles_datas_list(self, combo: List[List[float]], candles_datas_list: list, threshold: float) -> List[pd.DataFrame]:
+        to_return = []
+        for i in range(len(candles_datas_list)):
+            slice_start_indx = i
+            slice_end_indx = slice_start_indx + len(combo)
+
+            if slice_end_indx >= len(candles_datas_list):
+                break
+
+            combo_to_compare = self.build_relative_candles_combo(candles_datas_list[slice_start_indx: slice_end_indx])
+            if self.compare_relative_candles_combos(combo, combo_to_compare, threshold):
+                found_combo_start_datetime = candles_datas_list[slice_start_indx].Time
+                found_combo_end_datetime = candles_datas_list[slice_end_indx].Time
+                to_return.append([found_combo_start_datetime, found_combo_end_datetime])
+        
+        return to_return
 
     def find_consolidation(self, df: pd.DataFrame) -> Optional[pd.DataFrame]: # dataframe of the consolidation zone
         pass
