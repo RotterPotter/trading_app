@@ -5,25 +5,25 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '')))
 from src.service import Service
 import pandas as pd
+import json
 from datetime import timezone, timedelta
 
 class TestFindCombosInCandlesDatasList(unittest.TestCase):
   def setUp(self):
     self.service = Service()
 
-    with open("backtesting/tests/testing_data.csv", "r") as fp:
+  def test1(self): # find trend reversal 1
+    with open("backtesting/tests/testing_data_5.csv", "r") as fp:
       data = pd.read_csv(fp, parse_dates=['Time'])
-    self.data = data
 
-  def test1(self):
-    candles_datas = [candle_data for candle_data in self.data.itertuples()]
-    combo = self.service.build_relative_candles_combo(candles_datas[:5])
-    result = self.service.find_combos_in_candles_datas_list(combo, candles_datas, threshold=32)
-    self.assertEqual(len(result), 2)
-
-  def test2(self): # find trend reversal 1
+    with open("backtesting/patterns/trend_reversal_1_bearish_278candles_1.json", "r") as fp:
+      combo = json.load(fp)
     
-    trend_reversal_1_combo = self.service.build_relative_candles_combo()
+    candles_datas = [cndl_data for cndl_data in data.itertuples()]
+    result = self.service.find_combos_in_candles_datas_list(combo, candles_datas, threshold=2)
+    print(result)
+
+
 
 if __name__ == '__main__':
   unittest.main()

@@ -7,16 +7,18 @@ from datetime import timezone, timedelta
 
 if __name__ == "__main__":
   service = Service()
+  cndl_size = 5
   data = service.take_polygon_gold_historical_data(
     from_="2025-01-01",
     to="2025-03-01",
     limit=50000,
-    candle_size=15,
-    tz=timezone(timedelta(hours=-5))
+    candle_size=cndl_size,
+    tz=timezone.utc
   )
 
-  with open("backtesting/tests/testing_data.csv", "w") as fp:
+  with open(f"backtesting/tests/testing_data_{cndl_size}.csv", "w") as fp:
     data.to_csv(fp)
+
 
   print("Success!")
   # print(sys.path)

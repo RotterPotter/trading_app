@@ -41,9 +41,6 @@ class Service:
         
         df = pd.DataFrame(aggs)
         
-        # Convert 'Time' column to string with timezone using apply
-        # df['Time'] = df['Time'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S%z'))
-        
         return df
     
     def calculate_sell_price(self, pdLSH: float, adL: float) -> float:
@@ -357,11 +354,16 @@ class Service:
         cndl_open = decimal.Decimal(cndl_data.Open)
         cndl_high = decimal.Decimal(cndl_data.High)
         cndl_low = decimal.Decimal(cndl_data.Low)
-        cl_op_rel_mov = (cndl_close / cndl_open) - 1
-        low_op_rel_mov = (cndl_low / cndl_open) - 1
-        h_op_rel_mov = (cndl_high / cndl_open) - 1 
-
-        return [round(cl_op_rel_mov * 100000, 2), round(low_op_rel_mov * 100000, 2), round(h_op_rel_mov * 100000, 2)]
+        
+        a = cndl_close - cndl_open 
+        b = cndl_high - cndl_open 
+        c = cndl_low - cndl_open 
+        
+        a = a if a != decimal.Decimal(0) else decimal.Decimal(0.0000001)
+        b = b if b != decimal.Decimal(0) else decimal.Decimal(0.0000001)
+        c = c if c != decimal.Decimal(0) else decimal.Decimal(0.0000001)
+        
+        return [float(round(a / b, 2)), float(round(a / c, 2)), float(round(b / c, 2))]
 
     def build_relative_candles_combo(self, candles_datas_list: list) -> List[List[float]]:
         return [self.relatively_describe_candle(candle_data) for candle_data in candles_datas_list]
@@ -412,8 +414,13 @@ class Service:
     def find_liquidity(self, df:pd.DataFrame) -> Optional[pd.DataFrame]:
         pass
 
-    def filter_df_by_datetime(self, df: pd.DataFrame, dt_start: datetime, dt_end: datetime) -> Optional[pd.DataFrame]: # if no dt_start or dt_end in a df, should return None
-        pass
+
+    def filter_df_by_datetime(self, df: pd.DataFrame, dt_start: datetime, dt_end: datetime) -> Optional[pd.DataFrame]:
+        mask = (df['Time'] >= dt_start) & (df['Time'] <= dt_end)
+        filtered_df = df.loc[mask]
+
+        return filtered_df 
+
 
     def calculate_poc_level(self, df:pd.DataFrame) -> float:
         pass
